@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http; // 1. Importamos el paquete HTTP
+import 'dart:convert'; // 2. Importamos para convertir JSON a objetos Dart
 
 void main() {
   runApp(const MyApp());
@@ -10,84 +12,100 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Catálogo de Películas',
-      debugShowCheckedModeBanner: false, // Elimina la etiqueta roja de DEBUG
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: const HomeScreen(),
+      title: 'Consumo de API',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(primarySwatch: Colors.red),
+      home: const PokemonScreen(),
     );
   }
 }
 
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+// 3. Usamos StatefulWidget porque el estado de la pantalla cambiará 
+// (de "cargando" a "mostrando datos" o "error").
+class PokemonScreen extends StatefulWidget {
+  const PokemonScreen({super.key});
+
+  @override
+  State<PokemonScreen> createState() => _PokemonScreenState();
+}
+
+class _PokemonScreenState extends State<PokemonScreen> {
+  // 4. Función asíncrona que hace la petición a Internet
+  Future<Map<String, dynamic>> fetchPokemon() async {
+    // Hacemos la petición GET a la URL de la PokéAPI (Pikachu)
+    final response = await http.get(Uri.parse('https://pokeapi.co/api/v2/pokemon/pikachu'));
+
+    // 5. Verificamos si la respuesta fue exitosa (Código 200)
+    if (response.statusCode == 200) {
+      // Si es exitosa, decodificamos el texto JSON a un Map de Dart
+      return jsonDecode(response.body);
+    } else {
+      // Si falla (ej. sin internet), lanzamos una excepción
+      throw Exception('Fallo al cargar los datos del Pokémon');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // PASO 1: Widget de diseño (Layout Widget)
-      // Stack nos permite superponer elementos uno encima del otro.
-      body: Stack(
-        fit: StackFit.expand, // Obliga al Stack a ocupar toda la pantalla disponible
-        children: [
-          
-          // PASO 2 y 3: Widgets visibles agregados al Stack
-          
-          // 1. WIDGET IMAGE: Imagen de fondo
-          // Usamos Image.network para cargar una imagen de internet sin configurar assets locales aún.
-          Image.network(
-            'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=1000&auto=format&fit=crop',
-            fit: BoxFit.cover, // Clave: hace que la imagen cubra todo el espacio sin deformarse
-          ),
-          
-          // Capa de oscurecimiento (UX Pro Tip): 
-          // Un Container semitransparente para garantizar que el texto blanco sea legible sobre cualquier imagen.
-          Container(
-            color: Colors.black.withOpacity(0.6),
-          ),
-
-          // 2. WIDGET COLUMN (dentro de un Center): Para organizar el contenido verticalmente
-          Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center, // Centra verticalmente
-              crossAxisAlignment: CrossAxisAlignment.center, // Centra horizontalmente
-              children: [
-                
-                // 3. WIDGET ICON: Ícono representativo de la aplicación
-                const Icon(
-                  Icons.local_movies, // Ícono de cine/película de la librería de Material
-                  size: 80.0,
-                  color: Colors.white,
-                ),
-                
-                const SizedBox(height: 20), // Espacio en blanco separador
-                
-                // 4. WIDGET TEXT: Nombre de la aplicación
-                const Text(
-                  'CineSync',
-                  style: TextStyle(
-                    fontSize: 36,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: 2.0, // Espaciado entre letras para elegancia
+      appBar: AppBar(
+        title: const Text('Datos desde Internet'),
+        backgroundColor: Colors.redAccent,
+      ),
+      // 6. FutureBuilder: El widget mágico que maneja los 3 estados de una petición
+      body: FutureBuilder<Map<String, dynamic>>(
+        future: fetchPokemon(), // Le decimos qué función asíncrona ejecutar
+        builder: (context, snapshot) {
+          // ESTADO A: Aún está cargando los datos
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          } 
+          // ESTADO B: Ocurrió un error
+          else if (snapshot.hasError) {
+            return Center(
+              child: Text(
+                'Error: ${snapshot.error}',
+                style: const TextStyle(color: Colors.red, fontSize: 18),
+              ),
+            );
+          } 
+          // ESTADO C: Los datos llegaron correctamente
+          else if (snapshot.hasData) {
+            final pokemon = snapshot.data!;
+            
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Imagen obtenida de la URL que nos dio la API
+                  Image.network(
+                    pokemon['sprites']['front_default'],
+                    width: 200,
+                    height: 200,
                   ),
-                ),
-                
-                const SizedBox(height: 10), // Espacio en blanco separador
-                
-                // 5. WIDGET TEXT: Mensaje de bienvenida / Criterio de evaluación "Hello World"
-                const Text(
-                  'Hello World',
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: Colors.white70, // Un blanco ligeramente transparente para jerarquía visual
+                  const SizedBox(height: 20),
+                  // Nombre capitalizado (ej: "Pikachu")
+                  Text(
+                    pokemon['name'].toUpperCase(),
+                    style: const TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
-        ],
+                  const SizedBox(height: 10),
+                  // Mostramos un dato numérico (ej: altura)
+                  Text(
+                    'Altura: ${pokemon['height']} decímetros',
+                    style: const TextStyle(fontSize: 18, color: Colors.grey),
+                  ),
+                ],
+              ),
+            );
+          }
+          
+          // Estado por defecto (no debería alcanzarse)
+          return const Center(child: Text('Sin datos'));
+        },
       ),
     );
   }
