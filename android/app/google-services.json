@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "233126705725",
+    "project_id": "ldsw-actividad-widgets",
+    "storage_bucket": "ldsw-actividad-widgets.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:233126705725:android:f69fe186aa2055df484854",
+        "android_client_info": {
+          "package_name": "com.example.ldsw_actividad_widgets"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB_txuvQErfflCC7H1L6lkenr_BTJQTKk8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

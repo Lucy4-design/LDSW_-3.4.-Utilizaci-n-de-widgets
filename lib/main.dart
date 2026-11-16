@@ -1,8 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http; // 1. Importamos el paquete HTTP
-import 'dart:convert'; // 2. Importamos para convertir JSON a objetos Dart
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'firebase_options.dart'; // Este archivo fue generado por flutterfire configure
 
-void main() {
+void main() async {
+  // 1. Asegurar que los widgets de Flutter estén inicializados
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // 2. Inicializar Firebase con las opciones de tu plataforma
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  
   runApp(const MyApp());
 }
 
@@ -12,36 +21,52 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Consumo de API',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(primarySwatch: Colors.red),
-      home: const PokemonScreen(),
+      title: 'Catálogo de Películas',
+      theme: ThemeData(primarySwatch: Colors.deepPurple),
+      home: const PantallaPeliculas(),
     );
   }
 }
 
-// 3. Usamos StatefulWidget porque el estado de la pantalla cambiará 
-// (de "cargando" a "mostrando datos" o "error").
-class PokemonScreen extends StatefulWidget {
-  const PokemonScreen({super.key});
+class PantallaPeliculas extends StatefulWidget {
+  const PantallaPeliculas({super.key});
 
   @override
-  State<PokemonScreen> createState() => _PokemonScreenState();
+  State<PantallaPeliculas> createState() => _PantallaPeliculasState();
 }
 
-class _PokemonScreenState extends State<PokemonScreen> {
-  // 4. Función asíncrona que hace la petición a Internet
-  Future<Map<String, dynamic>> fetchPokemon() async {
-    // Hacemos la petición GET a la URL de la PokéAPI (Pikachu)
-    final response = await http.get(Uri.parse('https://pokeapi.co/api/v2/pokemon/pikachu'));
+class _PantallaPeliculasState extends State<PantallaPeliculas> {
+  // Referencia a la colección "peliculas" en Firestore
+  final CollectionReference peliculas = FirebaseFirestore.instance.collection('peliculas');
+  
+  final TextEditingController _tituloController = TextEditingController();
+  final TextEditingController _generoController = TextEditingController();
+  final TextEditingController _anioController = TextEditingController();
 
-    // 5. Verificamos si la respuesta fue exitosa (Código 200)
-    if (response.statusCode == 200) {
-      // Si es exitosa, decodificamos el texto JSON a un Map de Dart
-      return jsonDecode(response.body);
-    } else {
-      // Si falla (ej. sin internet), lanzamos una excepción
-      throw Exception('Fallo al cargar los datos del Pokémon');
+  // FUNCIÓN CLAVE: Agregar película a Firebase Firestore
+  Future<void> agregarPelicula() async {
+    if (_tituloController.text.isEmpty) return;
+
+    await peliculas.add({
+      'titulo': _tituloController.text,
+      'genero': _generoController.text,
+      'anio': int.tryParse(_anioController.text) ?? 0,
+      'fecha_creacion': FieldValue.serverTimestamp(),
+    });
+
+    // Limpiar campos después de guardar
+    _tituloController.clear();
+    _generoController.clear();
+    _anioController.clear();
+
+    // Mostrar confirmación al usuario
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('¡Película agregada exitosamente a Firebase!'),
+          backgroundColor: Colors.green,
+        ),
+      );
     }
   }
 
@@ -49,63 +74,104 @@ class _PokemonScreenState extends State<PokemonScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Datos desde Internet'),
-        backgroundColor: Colors.redAccent,
+        title: const Text('Catálogo de Películas'),
+        centerTitle: true,
       ),
-      // 6. FutureBuilder: El widget mágico que maneja los 3 estados de una petición
-      body: FutureBuilder<Map<String, dynamic>>(
-        future: fetchPokemon(), // Le decimos qué función asíncrona ejecutar
-        builder: (context, snapshot) {
-          // ESTADO A: Aún está cargando los datos
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } 
-          // ESTADO B: Ocurrió un error
-          else if (snapshot.hasError) {
-            return Center(
-              child: Text(
-                'Error: ${snapshot.error}',
-                style: const TextStyle(color: Colors.red, fontSize: 18),
-              ),
-            );
-          } 
-          // ESTADO C: Los datos llegaron correctamente
-          else if (snapshot.hasData) {
-            final pokemon = snapshot.data!;
-            
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Imagen obtenida de la URL que nos dio la API
-                  Image.network(
-                    pokemon['sprites']['front_default'],
-                    width: 200,
-                    height: 200,
-                  ),
-                  const SizedBox(height: 20),
-                  // Nombre capitalizado (ej: "Pikachu")
-                  Text(
-                    pokemon['name'].toUpperCase(),
-                    style: const TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            // Formulario para agregar datos
+            Card(
+              elevation: 4,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: _tituloController,
+                      decoration: const InputDecoration(
+                        labelText: 'Título de la película',
+                        prefixIcon: Icon(Icons.movie),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  // Mostramos un dato numérico (ej: altura)
-                  Text(
-                    'Altura: ${pokemon['height']} decímetros',
-                    style: const TextStyle(fontSize: 18, color: Colors.grey),
-                  ),
-                ],
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _generoController,
+                      decoration: const InputDecoration(
+                        labelText: 'Género',
+                        prefixIcon: Icon(Icons.category),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _anioController,
+                      decoration: const InputDecoration(
+                        labelText: 'Año',
+                        prefixIcon: Icon(Icons.calendar_today),
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: agregarPelicula,
+                        icon: const Icon(Icons.add_circle_outline),
+                        label: const Text('Agregar a Firebase'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            );
-          }
-          
-          // Estado por defecto (no debería alcanzarse)
-          return const Center(child: Text('Sin datos'));
-        },
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Películas guardadas en la nube:',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+            
+            // Leer películas en tiempo real desde Firebase
+            Expanded(
+              child: StreamBuilder<QuerySnapshot>(
+                stream: peliculas.orderBy('fecha_creacion', descending: true).snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    return const Center(
+                      child: Text('No hay películas aún. ¡Agrega una!'),
+                    );
+                  }
+                  
+                  final docs = snapshot.data!.docs;
+                  return ListView.builder(
+                    itemCount: docs.length,
+                    itemBuilder: (context, index) {
+                      final data = docs[index].data() as Map<String, dynamic>;
+                      return Card(
+                        child: ListTile(
+                          leading: const Icon(Icons.local_movies, color: Colors.deepPurple, size: 40),
+                          title: Text(
+                            data['titulo'] ?? 'Sin título',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Text('${data['genero']} • ${data['anio']}'),
+                          isThreeLine: false,
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
